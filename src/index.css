@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: monospace;
+    @apply text-neutral-300;
+  }
+
+  pre {
+    font-family: monospace;
+    @apply text-neutral-300;
+  }
+
+  h1 {
+    @apply text-lg font-bold;
+  }
+}
