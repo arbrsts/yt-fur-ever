@@ -25,3 +25,17 @@ declare namespace NodeJS {
 interface Window {
   ipcRenderer: import('electron').IpcRenderer
 }
+
+
+export interface ElectronAPI {
+  runCommand: (command: string) => Promise<void>;
+  onYtDlpOutput: (callback: (data: string) => void) => void;
+  onYtDlpError: (callback: (data: string) => void) => void;
+  removeYtDlpListeners: () => void;
+}
+
+declare global {
+  interface Window {
+    ipcRenderer: ElectronAPI & import('electron').IpcRenderer;
+  }
+}

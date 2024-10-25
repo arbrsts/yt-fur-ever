@@ -16,6 +16,13 @@ electron.contextBridge.exposeInMainWorld("ipcRenderer", {
   invoke(...args) {
     const [channel, ...omit] = args;
     return electron.ipcRenderer.invoke(channel, ...omit);
+  },
+  runCommand: (command) => electron.ipcRenderer.invoke("run-command", command),
+  onYtDlpOutput: (callback) => electron.ipcRenderer.on("yt-dlp-output", (event, data) => callback(data)),
+  onYtDlpError: (callback) => electron.ipcRenderer.on("yt-dlp-error", (event, data) => callback(data)),
+  removeYtDlpListeners: () => {
+    electron.ipcRenderer.removeAllListeners("yt-dlp-output");
+    electron.ipcRenderer.removeAllListeners("yt-dlp-error");
   }
   // You can expose other APTs you need here.
   // ...

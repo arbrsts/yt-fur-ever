@@ -19,6 +19,17 @@ contextBridge.exposeInMainWorld('ipcRenderer', {
     return ipcRenderer.invoke(channel, ...omit)
   },
 
+  runCommand: (command: string) => ipcRenderer.invoke('run-command', command),
+  onYtDlpOutput: (callback: (data: string) => void) =>
+    ipcRenderer.on('yt-dlp-output', (event, data) => callback(data)),
+  onYtDlpError: (callback: (data: string) => void) =>
+    ipcRenderer.on('yt-dlp-error', (event, data) => callback(data)),
+  removeYtDlpListeners: () => {
+    ipcRenderer.removeAllListeners('yt-dlp-output');
+    ipcRenderer.removeAllListeners('yt-dlp-error');
+  }
+
+
   // You can expose other APTs you need here.
   // ...
 })
