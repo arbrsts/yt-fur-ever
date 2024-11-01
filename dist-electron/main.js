@@ -92,27 +92,27 @@ electron.ipcMain.handle("favorites-add", async (event, command) => {
 electron.ipcMain.handle("sync-collection", async (event, command) => {
   try {
     const favorites = await getFavorites();
-    await Promise.all(
-      favorites.map(async (favorite) => {
-        const sanitizedCommand = `.\\bin\\yt-dlp ${favorite.url} --flat-playlist --print id`;
-        const execPromise = () => {
-          return new Promise((resolve, reject) => {
-            child_process.exec(sanitizedCommand, (error, stdout2, stderr) => {
-              if (error) reject(error);
-              else resolve(stdout2);
-            });
+    for (const favorite of favorites) {
+      const sanitizedCommand = `.\\bin\\yt-dlp ${favorite.url} --flat-playlist --print id`;
+      const execPromise = () => {
+        return new Promise((resolve, reject) => {
+          child_process.exec(sanitizedCommand, (error, stdout2, stderr) => {
+            if (error) reject(error);
+            else resolve(stdout2);
           });
-        };
-        const stdout = await execPromise();
-        const playlist = stdout.split("\n");
-        const savedVideos = await getYoutubeIds(`.\\temp`);
-        const newVideos = playlist.filter((id) => !savedVideos.includes(id));
-        const downloadPromises = newVideos.map(async (newVideoId) => {
-          if (!newVideoId.length) {
-            console.error("Invalid id: ", newVideoId);
-            return;
-          }
-          return new Promise((resolve, reject) => {
+        });
+      };
+      const stdout = await execPromise();
+      const playlist = stdout.split("\n");
+      const savedVideos = await getYoutubeIds(`.\\temp`);
+      const newVideos = playlist.filter((id) => !savedVideos.includes(id));
+      for (const newVideoId of newVideos) {
+        if (!newVideoId.length) {
+          console.error("Invalid id: ", newVideoId);
+          continue;
+        }
+        try {
+          await new Promise((resolve, reject) => {
             downloadMusic(
               `https://www.youtube.com/watch?v=${newVideoId}`,
               (data) => {
@@ -120,11 +120,12 @@ electron.ipcMain.handle("sync-collection", async (event, command) => {
               }
             ).then(resolve).catch(reject);
           });
-        });
-        await Promise.all(downloadPromises);
-        console.log("new", newVideos);
-      })
-    );
+        } catch (error) {
+          console.error(`Failed to download ${newVideoId}:`, error);
+        }
+      }
+      console.log("new", newVideos);
+    }
     console.log("All downloads completed");
     return { success: true };
   } catch (err) {

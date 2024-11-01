@@ -114,37 +114,36 @@ ipcMain.handle("favorites-add", async (event, command) => {
 ipcMain.handle("sync-collection", async (event, command) => {
   try {
     const favorites = await getFavorites();
-
-    // Wait for all favorites to be processed
-    await Promise.all(
-      favorites.map(async (favorite) => {
-        const sanitizedCommand = `.\\bin\\yt-dlp ${favorite.url} --flat-playlist --print id`;
-
-        // Convert exec to Promise
-        const execPromise = () => {
-          return new Promise((resolve, reject) => {
-            exec(sanitizedCommand, (error, stdout, stderr) => {
-              if (error) reject(error);
-              else resolve(stdout);
-            });
+    
+    // Process favorites one at a time
+    for (const favorite of favorites) {
+      const sanitizedCommand = `.\\bin\\yt-dlp ${favorite.url} --flat-playlist --print id`;
+      
+      // Convert exec to Promise
+      const execPromise = () => {
+        return new Promise((resolve, reject) => {
+          exec(sanitizedCommand, (error, stdout, stderr) => {
+            if (error) reject(error);
+            else resolve(stdout);
           });
-        };
+        });
+      };
 
-        // Get playlist IDs
-        const stdout = await execPromise();
-        const playlist = stdout.split("\n");
-        const savedVideos = await getYoutubeIds(`.\\temp`);
-        const newVideos = playlist.filter((id) => !savedVideos.includes(id));
+      // Get playlist IDs
+      const stdout = await execPromise();
+      const playlist = stdout.split("\n");
+      const savedVideos = await getYoutubeIds(`.\\temp`);
+      const newVideos = playlist.filter((id) => !savedVideos.includes(id));
 
-        // Create download Promise for each video
-        const downloadPromises = newVideos.map(async (newVideoId) => {
-          if (!newVideoId.length) {
-            console.error("Invalid id: ", newVideoId);
-            return;
-          }
-
-          // Convert downloadMusic to Promise
-          return new Promise((resolve, reject) => {
+      // Process videos in this playlist one at a time
+      for (const newVideoId of newVideos) {
+        if (!newVideoId.length) {
+          console.error("Invalid id: ", newVideoId);
+          continue;
+        }
+        
+        try {
+          await new Promise((resolve, reject) => {
             downloadMusic(
               `https://www.youtube.com/watch?v=${newVideoId}`,
               (data) => {
@@ -154,14 +153,14 @@ ipcMain.handle("sync-collection", async (event, command) => {
               .then(resolve)
               .catch(reject);
           });
-        });
-
-        // Wait for all downloads in this playlist to complete
-        await Promise.all(downloadPromises);
-        console.log("new", newVideos);
-      })
-    );
-
+        } catch (error) {
+          console.error(`Failed to download ${newVideoId}:`, error);
+        }
+      }
+      
+      console.log("new", newVideos);
+    }
+    
     console.log("All downloads completed");
     return { success: true };
   } catch (err) {
