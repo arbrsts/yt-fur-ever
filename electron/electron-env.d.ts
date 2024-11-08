@@ -21,14 +21,12 @@ declare namespace NodeJS {
   }
 }
 
-// Used in Renderer process, expose in `preload.ts`
-interface Window {
-  ipcRenderer: import('electron').IpcRenderer
-}
-
-
-export interface ElectronAPI {
-  runCommand: (command: string) => Promise<void>;
+interface ElectronAPI {
+  on: (channel: string, listener: (event: Electron.IpcRendererEvent, ...args: any[]) => void) => void;
+  off: (channel: string, ...args: any[]) => void;
+  send: (channel: string, ...args: any[]) => void;
+  invoke: (channel: string, ...args: any[]) => Promise<any>;
+  runCommand: (command: string) => Promise<any>;
   onYtDlpOutput: (callback: (data: string) => void) => void;
   onYtDlpError: (callback: (data: string) => void) => void;
   removeYtDlpListeners: () => void;
@@ -36,6 +34,6 @@ export interface ElectronAPI {
 
 declare global {
   interface Window {
-    ipcRenderer: ElectronAPI & import('electron').IpcRenderer;
+    electron: ElectronAPI;
   }
 }

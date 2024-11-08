@@ -1,4 +1,7 @@
 "use strict";
+var __defProp = Object.defineProperty;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __publicField = (obj, key, value) => __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
 Object.defineProperty(exports, Symbol.toStringTag, { value: "Module" });
 const electron = require("electron");
 const node_module = require("node:module");
@@ -42,7 +45,7 @@ function createWindow() {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: true,
-      preload: path__namespace.join(__dirname$1, "preload.mjs")
+      preload: path__namespace.join(__dirname$1, "preload.js")
     }
   });
   win.webContents.on("did-finish-load", () => {
@@ -66,8 +69,7 @@ electron.app.on("activate", () => {
   }
 });
 const db = require$1("better-sqlite3")("./furever.db");
-const row = db.prepare("SELECT * FROM favorites").get();
-console.log(row);
+db.prepare("SELECT * FROM favorites").get();
 const getFavorites = () => {
   const rows = db.prepare("SELECT * FROM favorites").all();
   return rows;
@@ -84,10 +86,133 @@ electron.ipcMain.handle("favorites-add", async (event, command) => {
   const test = await execAsync(sanitizedCommand);
   const output = JSON.parse(test.stdout);
   if (command) {
-    const stmt = db.prepare("INSERT INTO favorites (url, title) VALUES (?, ?)");
-    const info = stmt.run(command, output.title);
-    console.log("command", info, output.title);
+    const insertStmt = db.prepare(
+      "INSERT INTO favorites (url, title) VALUES (?, ?)"
+    );
+    const result = insertStmt.run(command, output.title);
+    const getStmt = db.prepare("SELECT * FROM favorites WHERE rowid = ?");
+    const insertedRow = getStmt.get(result.lastInsertRowid);
+    return insertedRow;
   }
+});
+const getSetting = (key) => {
+  const rows = db.prepare(`SELECT * FROM settings WHERE key='${key}'`).all();
+  return rows[0].value;
+};
+electron.ipcMain.handle("settings-get", async (event, command) => {
+  return getSetting(command);
+});
+electron.ipcMain.handle("choose-location", async () => {
+  const { dialog } = require$1("electron");
+  const { filePaths } = await dialog.showOpenDialog({
+    properties: ["openDirectory"]
+  });
+  console.log(filePaths);
+  if (filePaths) {
+    const stmt = db.prepare(
+      "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value"
+    );
+    const info = stmt.run("savePath", filePaths[0]);
+    console.log(info);
+    return filePaths[0];
+  }
+});
+class DownloadManager {
+  constructor({ onFinish, onStdout, onStderr, onUpdate }) {
+    __publicField(this, "queue", []);
+    __publicField(this, "currentDownload");
+    __publicField(this, "isProcessing", false);
+    // Add this flag
+    __publicField(this, "onFinish");
+    __publicField(this, "onStdout");
+    __publicField(this, "onStderr");
+    __publicField(this, "onUpdate");
+    this.onFinish = onFinish;
+    this.onStdout = onStdout;
+    this.onStderr = onStderr;
+    this.onUpdate = onUpdate;
+  }
+  add(url) {
+    this.queue.push({ url });
+    this.onUpdate(this.queue);
+    if (!this.isProcessing) {
+      this.isProcessing = true;
+      this.onFinish(this.isProcessing);
+      this.processNext();
+    }
+  }
+  processNext() {
+    console.log("processing", this.queue);
+    const downloadCommand = `.\\bin\\yt-dlp  ${this.queue[0].url} --embed-thumbnail -f bestaudio -x --audio-format mp3 --audio-quality 320k --embed-metadata -P ${getSetting(
+      "savePath"
+    )}`;
+    const ytDlp = child_process.spawn(downloadCommand, [], { shell: true });
+    this.currentDownload = ytDlp;
+    const onStdout = this.onStdout;
+    const onStderr = this.onStderr;
+    if (onStdout) ytDlp.stdout.on("data", onStdout);
+    if (onStderr) ytDlp.stderr.on("data", onStderr);
+    ytDlp.on("close", (code) => {
+      this.queue.shift();
+      this.onUpdate(this.queue);
+      this.currentDownload = void 0;
+      if (this.queue.length > 0) {
+        this.processNext();
+      } else {
+        this.isProcessing = false;
+        this.onFinish(this.isProcessing);
+      }
+    });
+  }
+  cancel() {
+    if (process.platform === "win32") {
+      const processesToKill = [
+        "yt-dlp.exe",
+        "ffmpeg.exe",
+        "ffprobe.exe",
+        "AtomicParsley.exe"
+        // Used for embedding thumbnails
+      ];
+      processesToKill.forEach((processName) => {
+        try {
+          child_process.spawn("taskkill", ["/IM", processName, "/F"]);
+        } catch (error) {
+          console.error(`Failed to kill ${processName}:`, error);
+        }
+      });
+      child_process.spawn("taskkill", ["/FI", "WINDOWTITLE eq *yt-dlp*", "/F"]);
+      child_process.spawn("taskkill", ["/FI", "WINDOWTITLE eq *ffmpeg*", "/F"]);
+    } else {
+      ["yt-dlp", "ffmpeg", "ffprobe", "AtomicParsley"].forEach(
+        (processName) => {
+          try {
+            child_process.spawn("pkill", ["-f", processName]);
+          } catch (error) {
+            console.error(`Failed to kill ${processName}:`, error);
+          }
+        }
+      );
+    }
+    this.queue = [];
+    this.currentDownload = void 0;
+    this.onFinish(this.isProcessing);
+    this.isProcessing = false;
+  }
+}
+const downloadManager = new DownloadManager({
+  onFinish: (isDownloading) => {
+    win == null ? void 0 : win.webContents.send("yt-dlp-status", isDownloading);
+  },
+  onStdout: (data) => {
+    console.log(data.toString());
+  },
+  onUpdate: (queue) => {
+    win == null ? void 0 : win.webContents.send("yt-dlp-update", queue);
+  }
+});
+electron.ipcMain.handle("download-cancel", () => {
+  console.log("cancelling");
+  downloadManager.cancel();
 });
 electron.ipcMain.handle("sync-collection", async (event, command) => {
   try {
@@ -104,30 +229,22 @@ electron.ipcMain.handle("sync-collection", async (event, command) => {
       };
       const stdout = await execPromise();
       const playlist = stdout.split("\n");
-      const savedVideos = await getYoutubeIds(`.\\temp`);
+      const savedVideos = await getYoutubeIds(getSetting("savePath"));
       const newVideos = playlist.filter((id) => !savedVideos.includes(id));
       for (const newVideoId of newVideos) {
         if (!newVideoId.length) {
           console.error("Invalid id: ", newVideoId);
           continue;
         }
+        const url = `https://www.youtube.com/watch?v=${newVideoId}`;
         try {
-          await new Promise((resolve, reject) => {
-            downloadMusic(
-              `https://www.youtube.com/watch?v=${newVideoId}`,
-              (data) => {
-                event.sender.send("yt-dlp-output", data.toString());
-              }
-            ).then(resolve).catch(reject);
-          });
+          downloadManager.add(url);
         } catch (error) {
           console.error(`Failed to download ${newVideoId}:`, error);
         }
       }
-      console.log("new", newVideos);
     }
-    console.log("All downloads completed");
-    return { success: true };
+    return { success: true, data: downloadManager.queue };
   } catch (err) {
     console.error("Error during sync:", err);
     return { success: false, error: err.message };
@@ -149,25 +266,14 @@ function getYoutubeIds(directory) {
   });
 }
 electron.ipcMain.handle("test", async () => {
-  const ids = await getYoutubeIds("./temp");
-  console.log(ids);
-  console.log("hi");
+  const savePath = getSetting("savePath");
+  const ids = await getYoutubeIds(savePath);
   return ids;
 });
-const downloadMusic = (url, onStdout, onStderr) => {
-  const downloadCommand = `.\\bin\\yt-dlp  ${url} --embed-thumbnail -f bestaudio -x --audio-format mp3 --audio-quality 320k --embed-metadata -P .\\temp`;
-  const ytDlp = child_process.spawn(downloadCommand, [], { shell: true });
-  if (onStdout) ytDlp.stdout.on("data", onStdout);
-  return new Promise((resolve, reject) => {
-    ytDlp.on("close", (code) => {
-      if (code === 0) {
-        resolve();
-      } else {
-        reject(new Error(`yt-dlp process exited with code ${code}`));
-      }
-    });
-  });
-};
+electron.ipcMain.on("increment", (event, amount) => {
+  const result = amount + 1;
+  event.reply("increment-reply", result);
+});
 electron.app.whenReady().then(createWindow);
 exports.MAIN_DIST = MAIN_DIST;
 exports.RENDERER_DIST = RENDERER_DIST;
