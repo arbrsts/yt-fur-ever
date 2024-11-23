@@ -120,8 +120,8 @@ const getSetting = (key: string) => {
   return rows[0].value;
 };
 
-ipcMain.handle("settings-get", async (event, command) => {
-  return getSetting(command);
+ipcMain.handle("settings-get", async (event, { key }) => {
+  return getSetting(key);
 });
 
 ipcMain.handle("choose-location", async () => {
@@ -139,6 +139,30 @@ ipcMain.handle("choose-location", async () => {
     console.log(info);
 
     return filePaths[0];
+  }
+});
+
+ipcMain.handle("settings-set", async (event, command) => {
+  const { key, value, type } = command;
+
+  let finalValue = value ?? undefined;
+
+  if (type == "path") {
+    const { dialog } = require("electron");
+    const { filePaths } = await dialog.showOpenDialog({
+      properties: ["openDirectory"],
+    });
+    console.log(filePaths);
+    finalValue = filePaths[0];
+  }
+
+  if (finalValue) {
+    const stmt = db.prepare(
+      "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value"
+    );
+    const info = stmt.run(key, finalValue);
+
+    return finalValue;
   }
 });
 

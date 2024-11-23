@@ -4,6 +4,10 @@ import {
   useStartYtDlpMutation,
   useYtDlpStatusQuery,
 } from "../services/collectionService";
+import {
+  useGetSettingQuery,
+  useSetSettingMutation,
+} from "../services/settingsService";
 
 export const Collection = () => {
   const [url, setUrl] = useState<string>("");
@@ -31,6 +35,8 @@ export const Collection = () => {
 
   const [startYtDlp] = useStartYtDlpMutation();
   const { data } = useYtDlpStatusQuery();
+  const [setSetting] = useSetSettingMutation();
+  const { data: setting } = useGetSettingQuery({ key: "savePath" });
 
   return (
     <div className="border p-4">
@@ -62,13 +68,13 @@ export const Collection = () => {
       </Button>
       <Button
         onPress={() => {
-          const location = window.electron.invoke("choose-location");
+          setSetting({ key: "savePath", type: "path" });
+          // const location = window.electron.invoke("choose-location");
         }}
       >
         Choose Download Folder
       </Button>
-      <div>{JSON.stringify(location)}</div>
-
+      <div>{setting}</div>
       <h2 className="font-bold">Downloaded</h2>
       {downloaded.map((downloaded) => (
         <div>- {downloaded}</div>

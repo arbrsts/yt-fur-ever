@@ -99,8 +99,8 @@ const getSetting = (key) => {
   const rows = db.prepare(`SELECT * FROM settings WHERE key='${key}'`).all();
   return rows[0].value;
 };
-electron.ipcMain.handle("settings-get", async (event, command) => {
-  return getSetting(command);
+electron.ipcMain.handle("settings-get", async (event, { key }) => {
+  return getSetting(key);
 });
 electron.ipcMain.handle("choose-location", async () => {
   const { dialog } = require$1("electron");
@@ -115,6 +115,25 @@ electron.ipcMain.handle("choose-location", async () => {
     const info = stmt.run("savePath", filePaths[0]);
     console.log(info);
     return filePaths[0];
+  }
+});
+electron.ipcMain.handle("settings-set", async (event, command) => {
+  const { key, value, type } = command;
+  let finalValue = value ?? void 0;
+  if (type == "path") {
+    const { dialog } = require$1("electron");
+    const { filePaths } = await dialog.showOpenDialog({
+      properties: ["openDirectory"]
+    });
+    console.log(filePaths);
+    finalValue = filePaths[0];
+  }
+  if (finalValue) {
+    const stmt = db.prepare(
+      "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value"
+    );
+    stmt.run(key, finalValue);
+    return finalValue;
   }
 });
 class DownloadManager {
