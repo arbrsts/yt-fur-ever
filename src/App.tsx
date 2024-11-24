@@ -3,16 +3,17 @@ import "./App.css";
 import { Button } from "./ui/Button";
 import { Collection } from "./components/Collection";
 import { fureverApi } from "./services/fureverService";
+import { LoadingSpinner } from "./ui/LoadingSpinner";
 
 function App() {
-
   const {
     data: favorites,
     isLoading,
     error: favoriteError,
   } = fureverApi.useGetFavoritesQuery();
 
-  const [addFavorite] = fureverApi.useAddFavoriteMutation();
+  const [addFavorite, { isLoading: isAddFavoriteLoading }] =
+    fureverApi.useAddFavoriteMutation();
   const [removeFavorite] = fureverApi.useRemoveFavoriteMutation();
 
   const [newFavorite, setNewFavorite] = useState();
@@ -38,6 +39,8 @@ function App() {
             >
               Add
             </Button>
+
+            <LoadingSpinner loading={isAddFavoriteLoading} />
           </div>
 
           <div className="flex flex-col gap-2  ">
