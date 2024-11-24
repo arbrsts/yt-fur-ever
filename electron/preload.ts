@@ -1,4 +1,6 @@
 import { ipcRenderer, contextBridge } from "electron";
+import { SettingsGetParams, SettingsSetParams } from "./services/settings/types";
+import { IPC_CHANNELS } from "./services/constants";
 
 // --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld("electron", {
@@ -25,6 +27,13 @@ contextBridge.exposeInMainWorld("electron", {
     return ipcRenderer.once(channel, (event, ...args) =>
       listener(event, ...args)
     );
+  },
+
+  settings: {
+    get: (params: SettingsGetParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS.GET, params),
+    set: (params: SettingsSetParams) =>
+      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS.SET, params),
   },
 
   runCommand: (command: string) => ipcRenderer.invoke("run-command", command),

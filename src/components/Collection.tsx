@@ -1,42 +1,14 @@
-import { useState, useEffect } from "react";
 import { Button } from "../ui/Button";
-import {
-  useStartYtDlpMutation,
-  useYtDlpStatusQuery,
-} from "../services/collectionService";
-import {
-  useGetSettingQuery,
-  useSetSettingMutation,
-} from "../services/settingsService";
+
+import { fureverApi } from "../services/fureverService";
 
 export const Collection = () => {
-  const [url, setUrl] = useState<string>("");
+  const { data: downloaded } = fureverApi.useGetCollectionQuery();
 
-  const [downloaded, setDownloaded] = useState([]);
-  useEffect(() => {
-    const fetchData = async () => {
-      const saved = await window.electron.invoke("test");
-      setDownloaded(saved);
-    };
-
-    fetchData();
-  }, []);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      const savePath = await window.electron.invoke("settings-get", "savePath");
-      setLocation(savePath);
-    };
-
-    fetchData();
-  }, []);
-
-  const [location, setLocation] = useState();
-
-  const [startYtDlp] = useStartYtDlpMutation();
-  const { data } = useYtDlpStatusQuery();
-  const [setSetting] = useSetSettingMutation();
-  const { data: setting } = useGetSettingQuery({ key: "savePath" });
+  const [startYtDlp] = fureverApi.useStartYtDlpMutation();
+  const { data } = fureverApi.useYtDlpStatusQuery();
+  const [setSetting] = fureverApi.useSetSettingMutation();
+  const { data: setting } = fureverApi.useGetSettingQuery({ key: "savePath" });
 
   return (
     <div className="border p-4">
@@ -76,9 +48,7 @@ export const Collection = () => {
       </Button>
       <div>{setting}</div>
       <h2 className="font-bold">Downloaded</h2>
-      {downloaded.map((downloaded) => (
-        <div>- {downloaded}</div>
-      ))}
+      {downloaded && downloaded.map((downloaded) => <div>- {downloaded}</div>)}
     </div>
   );
 };

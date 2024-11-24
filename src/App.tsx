@@ -1,13 +1,8 @@
 import { useState } from "react";
 import "./App.css";
-import { useYtDlp } from "./useYtDlp";
 import { Button } from "./ui/Button";
-import {
-  useAddFavoriteMutation,
-  useGetFavoritesQuery,
-  useRemoveFavoriteMutation,
-} from "./services/favoriteService";
 import { Collection } from "./components/Collection";
+import { fureverApi } from "./services/fureverService";
 
 function App() {
   const [url, setUrl] = useState<string>("");
@@ -16,10 +11,10 @@ function App() {
     data: favorites,
     isLoading,
     error: favoriteError,
-  } = useGetFavoritesQuery();
+  } = fureverApi.useGetFavoritesQuery();
 
-  const [addFavorite] = useAddFavoriteMutation();
-  const [removeFavorite] = useRemoveFavoriteMutation();
+  const [addFavorite] = fureverApi.useAddFavoriteMutation();
+  const [removeFavorite] = fureverApi.useRemoveFavoriteMutation();
 
   const [newFavorite, setNewFavorite] = useState();
 
