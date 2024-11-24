@@ -5,7 +5,6 @@ import { Collection } from "./components/Collection";
 import { fureverApi } from "./services/fureverService";
 
 function App() {
-  const [url, setUrl] = useState<string>("");
 
   const {
     data: favorites,

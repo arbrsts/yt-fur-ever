@@ -14,6 +14,11 @@ type Favorite = {
   id: string;
 };
 
+/**
+ * TODO: Add code splitting
+ * 
+ * https://redux-toolkit.js.org/rtk-query/usage/code-splitting
+ */
 export const fureverApi = createApi({
   reducerPath: "fureverApi",
   baseQuery: electronBaseQuery(),
