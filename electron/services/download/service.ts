@@ -6,7 +6,7 @@ import { exec } from "child_process";
 import { promisify } from "util";
 import { DownloadManagerConfig, SyncResult } from "./types";
 import { DownloadManager } from "./DownloadManager";
-import { getYoutubeIds } from "../../main";
+import { getYoutubeIds, ytDlpPath } from "../../main";
 import { Favorite } from "../favorites/types";
 import { FavoritesService } from "../favorites/service";
 import { SettingsService } from "../settings/service";
@@ -77,7 +77,7 @@ export class DownloadService extends BaseIpcService {
   }
 
   private async processPlaylist(favorite: Favorite): Promise<void> {
-    const sanitizedCommand = `.\\bin\\yt-dlp ${favorite.url} --flat-playlist --print id`;
+    const sanitizedCommand = `${ytDlpPath} ${favorite.url} --flat-playlist --print id`;
 
     try {
       // Get playlist IDs

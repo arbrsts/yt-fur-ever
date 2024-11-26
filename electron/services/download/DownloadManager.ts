@@ -1,6 +1,7 @@
 import { ChildProcess } from "child_process";
 import { spawn } from "child_process";
 import { SettingsService } from "../settings/service";
+import { ytDlpPath } from "../../main";
 
 export class DownloadManager {
   public queue: {
@@ -42,7 +43,7 @@ export class DownloadManager {
 
   processNext() {
     console.log("processing", this.queue);
-    const downloadCommand = `.\\bin\\yt-dlp  ${
+    const downloadCommand = `${ytDlpPath}  ${
       this.queue[0].url
     } --embed-thumbnail -f bestaudio -x --audio-format mp3 --audio-quality 320k --embed-metadata -P ${this.settings.getSetting(
       "savePath"

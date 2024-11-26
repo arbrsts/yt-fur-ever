@@ -19,7 +19,6 @@ export class CollectionService extends BaseIpcService {
   }
 
   async getCollection(): Promise<string[]> {
-    console.log("getting");
     const savePath = this.settingsService.getSetting("savePath");
     const ids = (await this.getYoutubeIds(savePath)) as string[];
     return ids;

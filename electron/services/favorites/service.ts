@@ -5,6 +5,7 @@ import util from "util";
 import { exec } from "child_process";
 import { IPC_CHANNELS } from "../constants";
 import { AddFavoriteParams, Favorite, RemoveFavoriteParams } from "./types";
+import { ytDlpPath } from "../../main";
 
 const execAsync = util.promisify(exec);
 
@@ -42,7 +43,7 @@ export class FavoritesService extends BaseIpcService {
 
   private async addFavorite(url: string): Promise<Favorite | null> {
     try {
-      const sanitizedCommand = `.\\bin\\yt-dlp ${url} --skip-download --flat-playlist --dump-single-json`;
+      const sanitizedCommand = `${ytDlpPath} ${url} --skip-download --flat-playlist --dump-single-json`;
 
       const { stdout } = await execAsync(sanitizedCommand);
       const output = JSON.parse(stdout);

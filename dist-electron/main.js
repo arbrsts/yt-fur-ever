@@ -154,7 +154,7 @@ class FavoritesService extends BaseIpcService {
   }
   async addFavorite(url) {
     try {
-      const sanitizedCommand = `.\\bin\\yt-dlp ${url} --skip-download --flat-playlist --dump-single-json`;
+      const sanitizedCommand = `${ytDlpPath} ${url} --skip-download --flat-playlist --dump-single-json`;
       const { stdout } = await execAsync$1(sanitizedCommand);
       const output = JSON.parse(stdout);
       const insertStmt = this.db.prepare(
@@ -199,7 +199,7 @@ class DownloadManager {
   }
   processNext() {
     console.log("processing", this.queue);
-    const downloadCommand = `.\\bin\\yt-dlp  ${this.queue[0].url} --embed-thumbnail -f bestaudio -x --audio-format mp3 --audio-quality 320k --embed-metadata -P ${this.settings.getSetting(
+    const downloadCommand = `${ytDlpPath}  ${this.queue[0].url} --embed-thumbnail -f bestaudio -x --audio-format mp3 --audio-quality 320k --embed-metadata -P ${this.settings.getSetting(
       "savePath"
     )}`;
     const ytDlp = child_process.spawn(downloadCommand, [], { shell: true });
@@ -312,7 +312,7 @@ class DownloadService extends BaseIpcService {
     }
   }
   async processPlaylist(favorite) {
-    const sanitizedCommand = `.\\bin\\yt-dlp ${favorite.url} --flat-playlist --print id`;
+    const sanitizedCommand = `${ytDlpPath} ${favorite.url} --flat-playlist --print id`;
     try {
       const { stdout } = await execAsync(sanitizedCommand);
       const playlist = stdout.split("\n");
@@ -357,7 +357,6 @@ class CollectionService extends BaseIpcService {
     });
   }
   async getCollection() {
-    console.log("getting");
     const savePath = this.settingsService.getSetting("savePath");
     const ids = await this.getYoutubeIds(savePath);
     return ids;
@@ -385,6 +384,7 @@ process.env.APP_ROOT = path__namespace.join(__dirname$1, "..");
 const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 const MAIN_DIST = path__namespace.join(process.env.APP_ROOT, "dist-electron");
 const RENDERER_DIST = path__namespace.join(process.env.APP_ROOT, "dist");
+const ytDlpPath = process.env.NODE_ENV === "development" ? path__namespace.join(process.cwd(), "bin", "yt-dlp") : path__namespace.join(process.resourcesPath, "bin", "yt-dlp");
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path__namespace.join(process.env.APP_ROOT, "public") : RENDERER_DIST;
 let win;
 function createWindow() {
@@ -452,3 +452,4 @@ exports.MAIN_DIST = MAIN_DIST;
 exports.RENDERER_DIST = RENDERER_DIST;
 exports.VITE_DEV_SERVER_URL = VITE_DEV_SERVER_URL;
 exports.getYoutubeIds = getYoutubeIds;
+exports.ytDlpPath = ytDlpPath;

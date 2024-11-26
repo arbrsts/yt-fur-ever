@@ -31,6 +31,11 @@ export const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 export const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
 export const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
 
+
+export const ytDlpPath = process.env.NODE_ENV === 'development' 
+  ? path.join(process.cwd(), 'bin', 'yt-dlp')
+  : path.join(process.resourcesPath, 'bin', 'yt-dlp');
+
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   ? path.join(process.env.APP_ROOT, "public")
   : RENDERER_DIST;
