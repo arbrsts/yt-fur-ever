@@ -52,6 +52,8 @@ export class DownloadService extends BaseIpcService {
     );
   }
 
+  protected registerDatabase(): void {}
+
   private cancelDownload(): void {
     this.downloadManager.cancel();
   }

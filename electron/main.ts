@@ -25,16 +25,17 @@ import { SettingsService } from "./services/settings/service";
 import { FavoritesService } from "./services/favorites/service";
 import { DownloadService } from "./services/download/service";
 import { CollectionService } from "./services/collection/service";
+import db from "./db";
 
 // 🚧 Use ['ENV_NAME'] avoid vite:define plugin - Vite@2.x
 export const VITE_DEV_SERVER_URL = process.env["VITE_DEV_SERVER_URL"];
 export const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
 export const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
 
-
-export const ytDlpPath = process.env.NODE_ENV === 'development' 
-  ? path.join(process.cwd(), 'bin', 'yt-dlp')
-  : path.join(process.resourcesPath, 'bin', 'yt-dlp');
+export const ytDlpPath =
+  process.env.NODE_ENV === "development"
+    ? path.join(process.cwd(), "bin", "yt-dlp")
+    : path.join(process.resourcesPath, "bin", "yt-dlp");
 
 process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL
   ? path.join(process.env.APP_ROOT, "public")
@@ -63,8 +64,6 @@ function createWindow() {
     // win.loadFile('dist/index.html')
     win.loadFile(path.join(RENDERER_DIST, "index.html"));
   }
-
-  const db = require("better-sqlite3")("./furever.db");
 
   const settingsService = new SettingsService(db, ipcMain);
   const favoritesService = new FavoritesService(db, ipcMain);

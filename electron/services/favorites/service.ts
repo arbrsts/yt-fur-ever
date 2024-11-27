@@ -30,6 +30,8 @@ export class FavoritesService extends BaseIpcService {
     );
   }
 
+  protected registerDatabase(): void {}
+
   public getFavorites(): Favorite[] {
     const stmt = this.db.prepare("SELECT * FROM favorites");
     return stmt.all() as Favorite[];

@@ -4,6 +4,7 @@ import type { Database } from "better-sqlite3";
 import { IPC_CHANNELS } from "../constants";
 import type { SettingsGetParams, SettingsSetParams } from "./types";
 import { BaseIpcService } from "../BaseIPCService";
+import db from "../../db";
 
 export class SettingsService extends BaseIpcService {
   constructor(private readonly db: Database, ipcMain: IpcMain) {
@@ -17,6 +18,16 @@ export class SettingsService extends BaseIpcService {
 
     this.handle(IPC_CHANNELS.SETTINGS.SET, (params: SettingsSetParams) =>
       this.setSetting(params)
+    );
+  }
+
+  protected registerDatabase(): void {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS settings (
+      key VARCHAR(255) NOT NULL,
+      value VARCHAR(255) NOT NULL,
+      PRIMARY KEY (key)
+      );`
     );
   }
 

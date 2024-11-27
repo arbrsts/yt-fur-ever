@@ -55,6 +55,7 @@ class BaseIpcService {
   constructor(ipcMain) {
     this.ipcMain = ipcMain;
     this.registerChannels();
+    if (this.registerDatabase) this.registerDatabase();
   }
   // Utility method for handler registration
   handle(channel, handler) {
@@ -68,10 +69,11 @@ class BaseIpcService {
     });
   }
 }
+const db = require("better-sqlite3")("./furever.db");
 class SettingsService extends BaseIpcService {
-  constructor(db, ipcMain) {
+  constructor(db2, ipcMain) {
     super(ipcMain);
-    this.db = db;
+    this.db = db2;
   }
   registerChannels() {
     this.handle(
@@ -81,6 +83,16 @@ class SettingsService extends BaseIpcService {
     this.handle(
       IPC_CHANNELS.SETTINGS.SET,
       (params) => this.setSetting(params)
+    );
+  }
+  registerDatabase() {
+    db.exec(
+      `
+      CREATE TABLE IF NOT EXISTS settings (
+      key VARCHAR(255) NOT NULL,
+      value VARCHAR(255) NOT NULL,
+      PRIMARY KEY (key)
+      );`
     );
   }
   getSetting(key) {
@@ -125,9 +137,9 @@ class SettingsService extends BaseIpcService {
 }
 const execAsync$1 = util.promisify(child_process.exec);
 class FavoritesService extends BaseIpcService {
-  constructor(db, ipcMain) {
+  constructor(db2, ipcMain) {
     super(ipcMain);
-    this.db = db;
+    this.db = db2;
   }
   registerChannels() {
     this.handle(
@@ -142,6 +154,8 @@ class FavoritesService extends BaseIpcService {
       IPC_CHANNELS.FAVORITES.ADD,
       (params) => this.addFavorite(params)
     );
+  }
+  registerDatabase() {
   }
   getFavorites() {
     const stmt = this.db.prepare("SELECT * FROM favorites");
@@ -291,6 +305,8 @@ class DownloadService extends BaseIpcService {
       () => this.syncCollection()
     );
   }
+  registerDatabase() {
+  }
   cancelDownload() {
     this.downloadManager.cancel();
   }
@@ -356,6 +372,17 @@ class CollectionService extends BaseIpcService {
       return this.getCollection();
     });
   }
+  registerDatabase() {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS favorites (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        url VARCHAR(255),
+        title VARCHAR(255),
+        UNIQUE(id)
+      );
+    `);
+  }
   async getCollection() {
     const savePath = this.settingsService.getSetting("savePath");
     const ids = await this.getYoutubeIds(savePath);
@@ -404,7 +431,6 @@ function createWindow() {
   } else {
     win.loadFile(path__namespace.join(RENDERER_DIST, "index.html"));
   }
-  const db = require$1("better-sqlite3")("./furever.db");
   const settingsService = new SettingsService(db, electron.ipcMain);
   const favoritesService = new FavoritesService(db, electron.ipcMain);
   new DownloadService(

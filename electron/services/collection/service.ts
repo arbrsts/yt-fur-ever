@@ -3,6 +3,7 @@ import { BaseIpcService } from "../BaseIPCService";
 import { IPC_CHANNELS } from "../constants";
 import { SettingsService } from "../settings/service";
 import * as fs from "fs/promises";
+import db from "../../db";
 
 export class CollectionService extends BaseIpcService {
   private settingsService: SettingsService;
@@ -16,6 +17,18 @@ export class CollectionService extends BaseIpcService {
     this.handle<void, string[]>(IPC_CHANNELS.COLLECTION.GET, () => {
       return this.getCollection();
     });
+  }
+
+  protected registerDatabase(): void {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS favorites (
+        id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        url VARCHAR(255),
+        title VARCHAR(255),
+        UNIQUE(id)
+      );
+    `);
   }
 
   async getCollection(): Promise<string[]> {
