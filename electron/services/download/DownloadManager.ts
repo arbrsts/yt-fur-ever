@@ -3,36 +3,61 @@ import { spawn } from "child_process";
 import { SettingsService } from "../settings/service";
 import { ytDlpPath } from "../../main";
 
-export class DownloadManager {
-  public queue: {
-    url: string;
-  }[] = [];
-  private currentDownload?: ChildProcess;
-  public isProcessing = false; // Add this flag
-  private onFinish: () => void;
-  private onStdout: () => void;
-  private onStderr: () => void;
-  private onUpdate: () => void;
-  private settings: SettingsService;
+type CurrentDownload = {
+  queueItem: { url: string };
+  process: ChildProcess;
+  state: "ERROR" | "STARTED" | "SUCCESS";
+};
 
-  constructor({ onFinish, onStdout, onStderr, onUpdate, settings } : {
+type QueueItem = { url: string };
+type Queue = QueueItem[];
+
+export class DownloadManager {
+  public queue: Queue = [];
+  private currentDownload?: {
+    queueItem: { url: string };
+    process: ChildProcess;
+    state: "ERROR" | "STARTED" | "SUCCESS";
+  };
+  public isProcessing = false; // Add this flag
+  private onFinish;
+  private onStdout;
+  private onStderr;
+  private onQueueUpdate;
+  private onCurrentDownloadUpdate;
+
+  constructor({
+    onFinish,
+    onStdout,
+    onStderr,
+    onQueueUpdate,
+    onCurrentDownloadUpdate,
+    settings,
+  }: {
+    /*
+      Callbacks
+    */
     onFinish: () => void;
     onStdout: () => void;
     onStderr: () => void;
-    onUpdate: () => void;
-    settings: SettingsService
+    onQueueUpdate: (queue: Queue) => void;
+    onCurrentDownloadUpdate: (currentDownload: CurrentDownload) => void;
+
+    settings: SettingsService;
   }) {
     this.onFinish = onFinish;
     this.onStdout = onStdout;
     this.onStderr = onStderr;
-    this.onUpdate = onUpdate;
+    this.onQueueUpdate = onQueueUpdate;
+    this.onCurrentDownloadUpdate = onCurrentDownloadUpdate;
+
     this.settings = settings;
   }
 
   add(url: string) {
     this.queue.push({ url });
 
-    this.onUpdate(this.queue);
+    this.onQueueUpdate(this.queue);
 
     if (!this.isProcessing) {
       this.isProcessing = true;
@@ -50,7 +75,12 @@ export class DownloadManager {
     )}`;
 
     const ytDlp = spawn(downloadCommand, [], { shell: true });
-    this.currentDownload = ytDlp;
+
+    this.currentDownload = {
+      queueItem: this.queue[0],
+      process: ytDlp,
+      state: "STARTED",
+    };
 
     const onStdout = this.onStdout;
     const onStderr = this.onStderr;
@@ -62,7 +92,15 @@ export class DownloadManager {
     ytDlp.on("close", (code) => {
       this.queue.shift();
 
-      this.onUpdate(this.queue);
+      if (this.currentDownload?.process.exitCode !== 0) {
+        this.currentDownload.state = "ERROR";
+      } else {
+        this.currentDownload.state = "SUCCESS";
+      }
+
+      this.onCurrentDownloadUpdate(this.currentDownload);
+
+      this.onQueueUpdate(this.queue);
       this.currentDownload = undefined;
       if (this.queue.length > 0) {
         this.processNext(); // Process next in queue

@@ -1,6 +1,6 @@
 export interface Favorite {
   id: number;
-  url: string;
+  display_id: string;
   title: string;
 }
 

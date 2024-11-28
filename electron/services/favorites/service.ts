@@ -6,6 +6,7 @@ import { exec } from "child_process";
 import { IPC_CHANNELS } from "../constants";
 import { AddFavoriteParams, Favorite, RemoveFavoriteParams } from "./types";
 import { ytDlpPath } from "../../main";
+import db from "../../db";
 
 const execAsync = util.promisify(exec);
 
@@ -30,10 +31,17 @@ export class FavoritesService extends BaseIpcService {
     );
   }
 
-  protected registerDatabase(): void {}
+  protected registerDatabase(): void {
+    db.exec(
+      "CREATE TABLE IF NOT EXISTS favorites (id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, title VARCHAR(255), display_id VARCHAR(255) NULL, UNIQUE (id));"
+    );
+  }
 
   public getFavorites(): Favorite[] {
-    const stmt = this.db.prepare("SELECT * FROM favorites");
+    const stmt = this.db.prepare(
+      "SELECT f.*, d.downloaded FROM favorites f LEFT JOIN download d ON f.display_id= d.display_id;"
+    );
+    console.log(stmt.all());
     return stmt.all() as Favorite[];
   }
 
@@ -49,12 +57,13 @@ export class FavoritesService extends BaseIpcService {
 
       const { stdout } = await execAsync(sanitizedCommand);
       const output = JSON.parse(stdout);
+      console.log(output);
 
       const insertStmt = this.db.prepare(
-        "INSERT INTO favorites (url, title) VALUES (?, ?)"
+        "INSERT INTO favorites (title, display_id) VALUES (?, ?)"
       );
 
-      const result = insertStmt.run(url, output.title);
+      const result = insertStmt.run(output.title, output.display_id);
 
       const getStmt = this.db.prepare(
         "SELECT * FROM favorites WHERE rowid = ?"

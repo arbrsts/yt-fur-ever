@@ -60,6 +60,8 @@ function App() {
                     </div>
 
                     <p>{favorite.url}</p>
+                    <p>{favorite.display_id}</p>
+                    <p>{favorite.downloaded ? "Downloaded" : ""}</p>
                   </div>
                 );
               })}

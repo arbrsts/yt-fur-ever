@@ -156,9 +156,15 @@ class FavoritesService extends BaseIpcService {
     );
   }
   registerDatabase() {
+    db.exec(
+      "CREATE TABLE IF NOT EXISTS favorites (id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, title VARCHAR(255), display_id VARCHAR(255) NULL, UNIQUE (id));"
+    );
   }
   getFavorites() {
-    const stmt = this.db.prepare("SELECT * FROM favorites");
+    const stmt = this.db.prepare(
+      "SELECT f.*, d.downloaded FROM favorites f LEFT JOIN download d ON f.display_id= d.display_id;"
+    );
+    console.log(stmt.all());
     return stmt.all();
   }
   removeFavorite(id) {
@@ -171,10 +177,11 @@ class FavoritesService extends BaseIpcService {
       const sanitizedCommand = `${ytDlpPath} ${url} --skip-download --flat-playlist --dump-single-json`;
       const { stdout } = await execAsync$1(sanitizedCommand);
       const output = JSON.parse(stdout);
+      console.log(output);
       const insertStmt = this.db.prepare(
-        "INSERT INTO favorites (url, title) VALUES (?, ?)"
+        "INSERT INTO favorites (title, display_id) VALUES (?, ?)"
       );
-      const result = insertStmt.run(url, output.title);
+      const result = insertStmt.run(output.title, output.display_id);
       const getStmt = this.db.prepare(
         "SELECT * FROM favorites WHERE rowid = ?"
       );
@@ -186,7 +193,14 @@ class FavoritesService extends BaseIpcService {
   }
 }
 class DownloadManager {
-  constructor({ onFinish, onStdout, onStderr, onUpdate, settings }) {
+  constructor({
+    onFinish,
+    onStdout,
+    onStderr,
+    onQueueUpdate,
+    onCurrentDownloadUpdate,
+    settings
+  }) {
     __publicField(this, "queue", []);
     __publicField(this, "currentDownload");
     __publicField(this, "isProcessing", false);
@@ -194,17 +208,18 @@ class DownloadManager {
     __publicField(this, "onFinish");
     __publicField(this, "onStdout");
     __publicField(this, "onStderr");
-    __publicField(this, "onUpdate");
-    __publicField(this, "settings");
+    __publicField(this, "onQueueUpdate");
+    __publicField(this, "onCurrentDownloadUpdate");
     this.onFinish = onFinish;
     this.onStdout = onStdout;
     this.onStderr = onStderr;
-    this.onUpdate = onUpdate;
+    this.onQueueUpdate = onQueueUpdate;
+    this.onCurrentDownloadUpdate = onCurrentDownloadUpdate;
     this.settings = settings;
   }
   add(url) {
     this.queue.push({ url });
-    this.onUpdate(this.queue);
+    this.onQueueUpdate(this.queue);
     if (!this.isProcessing) {
       this.isProcessing = true;
       this.onFinish(this.isProcessing);
@@ -217,14 +232,25 @@ class DownloadManager {
       "savePath"
     )}`;
     const ytDlp = child_process.spawn(downloadCommand, [], { shell: true });
-    this.currentDownload = ytDlp;
+    this.currentDownload = {
+      queueItem: this.queue[0],
+      process: ytDlp,
+      state: "STARTED"
+    };
     const onStdout = this.onStdout;
     const onStderr = this.onStderr;
     if (onStdout) ytDlp.stdout.on("data", onStdout);
     if (onStderr) ytDlp.stderr.on("data", onStderr);
     ytDlp.on("close", (code) => {
+      var _a;
       this.queue.shift();
-      this.onUpdate(this.queue);
+      if (((_a = this.currentDownload) == null ? void 0 : _a.process.exitCode) !== 0) {
+        this.currentDownload.state = "ERROR";
+      } else {
+        this.currentDownload.state = "SUCCESS";
+      }
+      this.onCurrentDownloadUpdate(this.currentDownload);
+      this.onQueueUpdate(this.queue);
       this.currentDownload = void 0;
       if (this.queue.length > 0) {
         this.processNext();
@@ -287,10 +313,21 @@ class DownloadService extends BaseIpcService {
       onStdout: (data) => {
         console.log(data.toString());
       },
-      onUpdate: (queue) => {
+      onQueueUpdate: (queue) => {
         var _a;
-        console.log("updating", this.rendererWindow);
+        console.log("updating", queue);
         (_a = this.rendererWindow) == null ? void 0 : _a.webContents.send("yt-dlp-update", queue);
+      },
+      onCurrentDownloadUpdate: (currentDownload) => {
+        if (currentDownload == null ? void 0 : currentDownload.queueItem) {
+          const stmt = db.prepare(
+            "INSERT INTO download (display_id, downloaded) VALUES (?, ?) ON CONFLICT(display_id) DO UPDATE SET downloaded = excluded.downloaded;"
+          );
+          stmt.run(
+            currentDownload.queueItem.url,
+            currentDownload.state == "SUCCESS" ? 1 : 0
+          );
+        }
       },
       settings: this.settingsService
     });
@@ -306,6 +343,15 @@ class DownloadService extends BaseIpcService {
     );
   }
   registerDatabase() {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS download (
+      id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+      created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      downloaded BOOLEAN,
+      display_id VARCHAR(255) NULL UNIQUE,
+      UNIQUE(id)
+      ); 
+    `);
   }
   cancelDownload() {
     this.downloadManager.cancel();
@@ -328,22 +374,15 @@ class DownloadService extends BaseIpcService {
     }
   }
   async processPlaylist(favorite) {
-    const sanitizedCommand = `${ytDlpPath} ${favorite.url} --flat-playlist --print id`;
+    const sanitizedCommand = `${ytDlpPath} ${favorite.display_id} --flat-playlist --print id`;
     try {
       const { stdout } = await execAsync(sanitizedCommand);
-      const playlist = stdout.split("\n");
-      const savedVideos = await getYoutubeIds(
-        this.downloadManager.settings.getSetting("savePath")
-      );
-      const newVideos = playlist.filter(
-        (id) => id.length && !savedVideos.includes(id)
-      );
-      for (const videoId of newVideos) {
-        const url = `https://www.youtube.com/watch?v=${videoId}`;
+      const playlist = stdout.split("\n").filter(Boolean);
+      for (const url of playlist) {
         try {
           this.downloadManager.add(url);
         } catch (error) {
-          console.error(`Failed to queue ${videoId}:`, error);
+          console.error(`Failed to queue ${url}:`, error);
         }
       }
     } catch (error) {
