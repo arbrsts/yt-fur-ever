@@ -1,7 +1,7 @@
 // src/services/download/service.ts
 import { IpcMain } from "electron";
 import { BaseIpcService } from "../BaseIPCService";
-import { IPC_CHANNELS } from "../constants";
+import { IPC_CHANNELS } from "@yt-fur-ever/ipc";
 import { exec } from "child_process";
 import { promisify } from "util";
 import { DownloadManagerConfig, SyncResult } from "./types";
@@ -30,7 +30,10 @@ export class DownloadService extends BaseIpcService {
 
     this.downloadManager = new DownloadManager({
       onFinish: (isDownloading) => {
-        this.rendererWindow?.webContents.send("yt-dlp-status", isDownloading);
+        this.rendererWindow?.webContents.send(
+          IPC_CHANNELS.DOWNLOAD.STATUS_UPDATE,
+          isDownloading
+        );
       },
       onStdout: (data) => {
         console.log(data.toString());
@@ -38,7 +41,10 @@ export class DownloadService extends BaseIpcService {
       onQueueUpdate: (queue) => {
         console.log("updating", queue);
         // Send update to frontend
-        this.rendererWindow?.webContents.send("yt-dlp-update", queue);
+        this.rendererWindow?.webContents.send(
+          IPC_CHANNELS.DOWNLOAD.QUEUE_UPDATE,
+          queue
+        );
       },
       onCurrentDownloadUpdate: (currentDownload) => {
         // Persist update
@@ -49,6 +55,17 @@ export class DownloadService extends BaseIpcService {
           stmt.run(
             currentDownload.queueItem.url,
             currentDownload.state == "SUCCESS" ? 1 : 0
+          );
+
+          const { process, ...rest } = currentDownload;
+          const serialisableCurrentDownload = {
+            ...rest,
+            pid: process?.pid,
+          };
+
+          this.rendererWindow?.webContents.send(
+            IPC_CHANNELS.DOWNLOAD.CURRENT_DOWNLOAD_UPDATE,
+            serialisableCurrentDownload
           );
         }
       },

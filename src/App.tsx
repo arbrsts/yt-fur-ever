@@ -4,6 +4,7 @@ import { Button } from "./ui/Button";
 import { Collection } from "./components/Collection";
 import { fureverApi } from "./services/fureverService";
 import { LoadingSpinner } from "./ui/LoadingSpinner";
+import { useDispatch } from "react-redux";
 
 function App() {
   const {
@@ -17,6 +18,7 @@ function App() {
   const [removeFavorite] = fureverApi.useRemoveFavoriteMutation();
 
   const [newFavorite, setNewFavorite] = useState();
+  const dispatch = useDispatch();
 
   return (
     <>
@@ -41,13 +43,21 @@ function App() {
             </Button>
 
             <LoadingSpinner loading={isAddFavoriteLoading} />
+
+            <Button
+              onPress={() => {
+                dispatch(fureverApi.util.invalidateTags(["Favorites"]));
+              }}
+            >
+              Refresh
+            </Button>
           </div>
 
           <div className="flex flex-col gap-2  ">
             {favorites &&
               favorites.map((favorite) => {
                 return (
-                  <div className="bg-neutral-800 p-2">
+                  <div className="bg-neutral-800 p-2" key={favorite.created_at}>
                     <div className="flex justify-between">
                       <h2 className="font-medium text-lg">{favorite.title}</h2>
                       <Button

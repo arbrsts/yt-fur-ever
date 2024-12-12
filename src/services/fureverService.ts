@@ -14,9 +14,11 @@ type Favorite = {
   id: string;
 };
 
+import { IPC_CHANNELS } from "@yt-fur-ever/ipc";
+
 /**
  * TODO: Add code splitting
- * 
+ *
  * https://redux-toolkit.js.org/rtk-query/usage/code-splitting
  */
 export const fureverApi = createApi({
@@ -39,7 +41,9 @@ export const fureverApi = createApi({
      */
     startYtDlp: builder.mutation<void, void>({
       queryFn: async () => {
-        const res = await window.electron.invoke("sync-collection");
+        const res = await window.electron.invoke(
+          IPC_CHANNELS.DOWNLOAD.SYNC_COLLECTION
+        );
         return res;
       },
     }),
@@ -51,22 +55,9 @@ export const fureverApi = createApi({
 
       onCacheEntryAdded: async (
         arg,
-        { updateCachedData, cacheDataLoaded, cacheEntryRemoved }
+        { updateCachedData, cacheDataLoaded, cacheEntryRemoved, dispatch }
       ) => {
         await cacheDataLoaded;
-
-        const outputHandler = (data: string) => {
-          console.log("output running");
-          updateCachedData((draft) => {
-            draft.output += data;
-          });
-        };
-
-        const errorHandler = (data: string) => {
-          updateCachedData((draft) => {
-            draft.error += data;
-          });
-        };
 
         const statusHandler = (status: boolean) => {
           updateCachedData((draft) => {
@@ -80,18 +71,30 @@ export const fureverApi = createApi({
           });
         };
 
-        window.electron.onYtDlpOutput(outputHandler);
-        window.electron.onYtDlpError(errorHandler);
-        window.electron.on("yt-dlp-status", (event, status) =>
-          statusHandler(status)
+        window.electron.on(
+          IPC_CHANNELS.DOWNLOAD.STATUS_UPDATE,
+          (event, status) => statusHandler(status)
         );
-        window.electron.on("yt-dlp-update", (event, status) => {
-          console.log("received");
-          updateHandler(status);
-        });
+        window.electron.on(
+          IPC_CHANNELS.DOWNLOAD.QUEUE_UPDATE,
+          (event, status) => {
+            updateHandler(status);
+          }
+        );
+        window.electron.on(
+          IPC_CHANNELS.DOWNLOAD.CURRENT_DOWNLOAD_UPDATE,
+          (event, status) => {
+            dispatch(fureverApi.util.invalidateTags(["Favorites"]));
+          }
+        );
 
         await cacheEntryRemoved;
-        window.electron.removeYtDlpListeners();
+
+        window.electron.off(IPC_CHANNELS.DOWNLOAD.QUEUE_UPDATE);
+        window.electron.off(IPC_CHANNELS.DOWNLOAD.STATUS_UPDATE);
+        window.electron.off(
+          IPC_CHANNELS.DOWNLOAD.CURRENT_DOWNLOAD_UPDATE
+        );
       },
     }),
 

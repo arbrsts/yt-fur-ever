@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.3.0",
+    "@yt-fur-ever/ipc": "^0.0.0",
     "better-sqlite3": "^11.5.0",
     "react": "^18.2.0",
     "react-aria-components": "^1.4.1",
@@ -39,5 +40,8 @@
     "vite-plugin-electron": "^0.28.6",
     "vite-plugin-electron-renderer": "^0.14.5"
   },
-  "main": "dist-electron/main.js"
+  "main": "dist-electron/main.js",
+  "workspaces": [
+    "packages/*"
+  ]
 }

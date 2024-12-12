@@ -3,7 +3,7 @@ import { Database } from "better-sqlite3";
 import { BaseIpcService } from "../BaseIPCService";
 import util from "util";
 import { exec } from "child_process";
-import { IPC_CHANNELS } from "../constants";
+import { IPC_CHANNELS } from "@yt-fur-ever/ipc";
 import { AddFavoriteParams, Favorite, RemoveFavoriteParams } from "./types";
 import { ytDlpPath } from "../../main";
 import db from "../../db";
@@ -55,7 +55,9 @@ export class FavoritesService extends BaseIpcService {
     try {
       const sanitizedCommand = `${ytDlpPath} ${url} --skip-download --flat-playlist --dump-single-json`;
 
-      const { stdout } = await execAsync(sanitizedCommand);
+      const { stdout } = await execAsync(sanitizedCommand, {
+        maxBuffer: 1024 * 1024 * 10,
+      });
       const output = JSON.parse(stdout);
       console.log(output);
 

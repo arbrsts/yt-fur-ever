@@ -1,7 +1,7 @@
 // src/ipc/settings/handler.ts
 import { IpcMain, dialog } from "electron";
 import type { Database } from "better-sqlite3";
-import { IPC_CHANNELS } from "../constants";
+import { IPC_CHANNELS } from "@yt-fur-ever/ipc";
 import type { SettingsGetParams, SettingsSetParams } from "./types";
 import { BaseIpcService } from "../BaseIPCService";
 import db from "../../db";

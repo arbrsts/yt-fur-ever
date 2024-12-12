@@ -10,10 +10,11 @@ export const IPC_CHANNELS = {
   },
   DOWNLOAD: {
     CANCEL: "download-cancel",
-    SYNC_COLLECTION: "sync-collection",
+    SYNC_COLLECTION: "download-sync",
     // Events sent to renderer
-    STATUS: "yt-dlp-status",
-    UPDATE: "yt-dlp-update",
+    STATUS_UPDATE: "yt-dlp-status",
+    QUEUE_UPDATE: "yt-dlp-queue-update",
+    CURRENT_DOWNLOAD_UPDATE: "yt-dlp-current-download-update",
   },
   COLLECTION: {
     GET: "collection-get",

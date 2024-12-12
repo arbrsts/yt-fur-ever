@@ -1,0 +1,19 @@
+{
+  "name": "@yt-fur-ever/ipc",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "types": "src/constants.ts",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "~5.6.2",
+    "vite": "^6.0.1"
+  },
+  "exports": {
+    ".": "./src/constants.ts"
+  }
+}

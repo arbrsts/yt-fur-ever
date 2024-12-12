@@ -1,6 +1,6 @@
 import { IpcMain } from "electron";
 import { BaseIpcService } from "../BaseIPCService";
-import { IPC_CHANNELS } from "../constants";
+import { IPC_CHANNELS } from "@yt-fur-ever/ipc";
 import { SettingsService } from "../settings/service";
 import * as fs from "fs/promises";
 import db from "../../db";

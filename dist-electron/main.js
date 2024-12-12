@@ -41,10 +41,11 @@ const IPC_CHANNELS = {
   },
   DOWNLOAD: {
     CANCEL: "download-cancel",
-    SYNC_COLLECTION: "sync-collection",
+    SYNC_COLLECTION: "download-sync",
     // Events sent to renderer
-    STATUS: "yt-dlp-status",
-    UPDATE: "yt-dlp-update"
+    STATUS_UPDATE: "yt-dlp-status",
+    QUEUE_UPDATE: "yt-dlp-queue-update",
+    CURRENT_DOWNLOAD_UPDATE: "yt-dlp-current-download-update"
   },
   COLLECTION: {
     GET: "collection-get"
@@ -175,7 +176,9 @@ class FavoritesService extends BaseIpcService {
   async addFavorite(url) {
     try {
       const sanitizedCommand = `${ytDlpPath} ${url} --skip-download --flat-playlist --dump-single-json`;
-      const { stdout } = await execAsync$1(sanitizedCommand);
+      const { stdout } = await execAsync$1(sanitizedCommand, {
+        maxBuffer: 1024 * 1024 * 10
+      });
       const output = JSON.parse(stdout);
       console.log(output);
       const insertStmt = this.db.prepare(
@@ -308,7 +311,10 @@ class DownloadService extends BaseIpcService {
     this.downloadManager = new DownloadManager({
       onFinish: (isDownloading) => {
         var _a;
-        (_a = this.rendererWindow) == null ? void 0 : _a.webContents.send("yt-dlp-status", isDownloading);
+        (_a = this.rendererWindow) == null ? void 0 : _a.webContents.send(
+          IPC_CHANNELS.DOWNLOAD.STATUS_UPDATE,
+          isDownloading
+        );
       },
       onStdout: (data) => {
         console.log(data.toString());
@@ -316,9 +322,13 @@ class DownloadService extends BaseIpcService {
       onQueueUpdate: (queue) => {
         var _a;
         console.log("updating", queue);
-        (_a = this.rendererWindow) == null ? void 0 : _a.webContents.send("yt-dlp-update", queue);
+        (_a = this.rendererWindow) == null ? void 0 : _a.webContents.send(
+          IPC_CHANNELS.DOWNLOAD.QUEUE_UPDATE,
+          queue
+        );
       },
       onCurrentDownloadUpdate: (currentDownload) => {
+        var _a;
         if (currentDownload == null ? void 0 : currentDownload.queueItem) {
           const stmt = db.prepare(
             "INSERT INTO download (display_id, downloaded) VALUES (?, ?) ON CONFLICT(display_id) DO UPDATE SET downloaded = excluded.downloaded;"
@@ -326,6 +336,15 @@ class DownloadService extends BaseIpcService {
           stmt.run(
             currentDownload.queueItem.url,
             currentDownload.state == "SUCCESS" ? 1 : 0
+          );
+          const { process: process2, ...rest } = currentDownload;
+          const serialisableCurrentDownload = {
+            ...rest,
+            pid: process2 == null ? void 0 : process2.pid
+          };
+          (_a = this.rendererWindow) == null ? void 0 : _a.webContents.send(
+            IPC_CHANNELS.DOWNLOAD.CURRENT_DOWNLOAD_UPDATE,
+            serialisableCurrentDownload
           );
         }
       },

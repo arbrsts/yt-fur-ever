@@ -8,6 +8,8 @@ export const Collection = () => {
   const [startYtDlp] = fureverApi.useStartYtDlpMutation();
   const { data } = fureverApi.useYtDlpStatusQuery();
   const [setSetting] = fureverApi.useSetSettingMutation();
+
+  console.log(data);
   const { data: setting } = fureverApi.useGetSettingQuery({ key: "savePath" });
 
   return (
@@ -48,7 +50,10 @@ export const Collection = () => {
       </Button>
       <div>{setting}</div>
       <h2 className="font-bold">Downloaded</h2>
-      {downloaded && downloaded.map((downloaded) => <div>- {downloaded}</div>)}
+      {downloaded &&
+        downloaded.map((downloaded) => (
+          <div key={downloaded}>- {downloaded}</div>
+        ))}
     </div>
   );
 };

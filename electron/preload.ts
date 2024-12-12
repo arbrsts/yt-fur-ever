@@ -1,6 +1,4 @@
 import { ipcRenderer, contextBridge } from "electron";
-import { SettingsGetParams, SettingsSetParams } from "./services/settings/types";
-import { IPC_CHANNELS } from "./services/constants";
 
 // --------- Expose some API to the Renderer process ---------
 contextBridge.exposeInMainWorld("electron", {
@@ -28,29 +26,4 @@ contextBridge.exposeInMainWorld("electron", {
       listener(event, ...args)
     );
   },
-
-  settings: {
-    get: (params: SettingsGetParams) =>
-      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS.GET, params),
-    set: (params: SettingsSetParams) =>
-      ipcRenderer.invoke(IPC_CHANNELS.SETTINGS.SET, params),
-  },
-
-  runCommand: (command: string) => ipcRenderer.invoke("run-command", command),
-  onYtDlpOutput: (callback: (data: string) => void) =>
-    ipcRenderer.on("yt-dlp-output", (event, data) => callback(data)),
-  onYtDlpError: (callback: (data: string) => void) =>
-    ipcRenderer.on("yt-dlp-error", (event, data) => callback(data)),
-  removeYtDlpListeners: () => {
-    ipcRenderer.removeAllListeners("yt-dlp-output");
-    ipcRenderer.removeAllListeners("yt-dlp-error");
-    ipcRenderer.removeAllListeners("yt-dlp-status");
-    ipcRenderer.removeAllListeners("yt-dlp-update");
-  },
-  receive: (channel: string, func: Function) => {
-    ipcRenderer.on(channel, (_, ...args) => func(...args));
-  },
-
-  // You can expose other APTs you need here.
-  // ...
 });
