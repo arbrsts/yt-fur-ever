@@ -33,22 +33,29 @@ export class FavoritesService extends BaseIpcService {
 
   protected registerDatabase(): void {
     db.exec(
-      "CREATE TABLE IF NOT EXISTS favorites (id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, title VARCHAR(255), display_id VARCHAR(255) NULL, UNIQUE (id));"
+      "CREATE TABLE IF NOT EXISTS favorites (_id INTEGER NOT NULL PRIMARY KEY, id VARCHAR(255) NOT NULL UNIQUE, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, type VARCHAR(255), title VARCHAR(255), parent_id INTEGER(255), FOREIGN KEY (parent_id) REFERENCES favorites(_id));"
     );
   }
 
   public getFavorites(): Favorite[] {
     const stmt = this.db.prepare(
-      "SELECT f.*, d.downloaded FROM favorites f LEFT JOIN download d ON f.display_id= d.display_id;"
+      "SELECT f.*, d.downloaded FROM favorites f LEFT JOIN download d ON f.id= d.id;"
     );
-    console.log(stmt.all());
     return stmt.all() as Favorite[];
   }
 
   private removeFavorite(id: number): void {
-    console.log("hi", id);
     const stmt = this.db.prepare("DELETE FROM favorites WHERE id = ?");
     stmt.run(id);
+  }
+
+  private async getYTJSONDump(url) {
+    const sanitizedCommand = `${ytDlpPath} ${url} --skip-download --flat-playlist --dump-single-json`;
+    const { stdout } = await execAsync(sanitizedCommand, {
+      maxBuffer: 1024 * 1024 * 10,
+    });
+
+    return JSON.parse(stdout);
   }
 
   private async addFavorite(url: string): Promise<Favorite | null> {
@@ -59,19 +66,38 @@ export class FavoritesService extends BaseIpcService {
         maxBuffer: 1024 * 1024 * 10,
       });
       const output = JSON.parse(stdout);
-      console.log(output);
 
-      const insertStmt = this.db.prepare(
-        "INSERT INTO favorites (title, display_id) VALUES (?, ?)"
-      );
+      if (output._type == "playlist") {
+        // Add parent playlist to satisfy foreign key constraint
+        const parentInsertionResult = this.db
+          .prepare("INSERT INTO favorites (id, type, title) VALUES (?, ?, ?)")
+          .run(output.channel_id, "playlist", output.title);
 
-      const result = insertStmt.run(output.title, output.display_id);
+        const parentPlaylistId = parentInsertionResult.lastInsertRowid;
 
-      const getStmt = this.db.prepare(
-        "SELECT * FROM favorites WHERE rowid = ?"
-      );
+        for (const entry of output.entries) {
+          if (entry._type == "playlist") {
+            const playlist = await this.getYTJSONDump(entry.webpage_url);
 
-      return getStmt.get(result.lastInsertRowid) as Favorite;
+            playlist.entries.forEach((entry) => {
+              const newInsertStmt = this.db.prepare(
+                "INSERT INTO favorites (id, type, title, parent_id) VALUES (?, ?, ?, ?)"
+              );
+              newInsertStmt.run(entry.id, "url", entry.title, parentPlaylistId);
+            });
+          }
+        }
+      } else {
+        this.db
+          .prepare("INSERT INTO favorites (id, type, title) VALUES (?, ?, ?)")
+          .run(output.id, "url", output.title);
+
+        const getStmt = this.db.prepare(
+          "SELECT * FROM favorites WHERE rowid = ?"
+        );
+
+        return getStmt.get(result.lastInsertRowid) as Favorite;
+      }
     } catch (error) {
       console.error("Error adding favorite:", error);
       return null;

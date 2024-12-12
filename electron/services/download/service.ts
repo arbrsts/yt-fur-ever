@@ -50,7 +50,7 @@ export class DownloadService extends BaseIpcService {
         // Persist update
         if (currentDownload?.queueItem) {
           const stmt = db.prepare(
-            "INSERT INTO download (display_id, downloaded) VALUES (?, ?) ON CONFLICT(display_id) DO UPDATE SET downloaded = excluded.downloaded;"
+            "INSERT INTO download (id, downloaded) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET downloaded = excluded.downloaded;"
           );
           stmt.run(
             currentDownload.queueItem.url,
@@ -87,10 +87,9 @@ export class DownloadService extends BaseIpcService {
   protected registerDatabase(): void {
     db.exec(`
       CREATE TABLE IF NOT EXISTS download (
-      id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+      id VARCHAR(2555) NOT NULL PRIMARY KEY,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       downloaded BOOLEAN,
-      display_id VARCHAR(255) NULL UNIQUE,
       UNIQUE(id)
       ); 
     `);
@@ -121,7 +120,7 @@ export class DownloadService extends BaseIpcService {
   }
 
   private async processPlaylist(favorite: Favorite): Promise<void> {
-    const sanitizedCommand = `${ytDlpPath} ${favorite.display_id} --flat-playlist --print id`;
+    const sanitizedCommand = `${ytDlpPath} ${favorite.id} --flat-playlist --print id`;
 
     try {
       // Get playlist IDs

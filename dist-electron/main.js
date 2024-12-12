@@ -105,12 +105,12 @@ class SettingsService extends BaseIpcService {
     const { key, value, type } = params;
     let finalValue = value ?? void 0;
     if (type === "path") {
-      const result = await electron.dialog.showOpenDialog({
+      const result2 = await electron.dialog.showOpenDialog({
         properties: ["openDirectory"]
       });
-      console.log(result);
-      if (!result.canceled && result.filePaths.length > 0) {
-        finalValue = result.filePaths[0];
+      console.log(result2);
+      if (!result2.canceled && result2.filePaths.length > 0) {
+        finalValue = result2.filePaths[0];
       } else {
         return null;
       }
@@ -158,20 +158,25 @@ class FavoritesService extends BaseIpcService {
   }
   registerDatabase() {
     db.exec(
-      "CREATE TABLE IF NOT EXISTS favorites (id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, title VARCHAR(255), display_id VARCHAR(255) NULL, UNIQUE (id));"
+      "CREATE TABLE IF NOT EXISTS favorites (_id INTEGER NOT NULL PRIMARY KEY, id VARCHAR(255) NOT NULL UNIQUE, created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP, type VARCHAR(255), title VARCHAR(255), parent_id INTEGER(255), FOREIGN KEY (parent_id) REFERENCES favorites(_id));"
     );
   }
   getFavorites() {
     const stmt = this.db.prepare(
-      "SELECT f.*, d.downloaded FROM favorites f LEFT JOIN download d ON f.display_id= d.display_id;"
+      "SELECT f.*, d.downloaded FROM favorites f LEFT JOIN download d ON f.id= d.id;"
     );
-    console.log(stmt.all());
     return stmt.all();
   }
   removeFavorite(id) {
-    console.log("hi", id);
     const stmt = this.db.prepare("DELETE FROM favorites WHERE id = ?");
     stmt.run(id);
+  }
+  async getYTJSONDump(url) {
+    const sanitizedCommand = `${ytDlpPath} ${url} --skip-download --flat-playlist --dump-single-json`;
+    const { stdout } = await execAsync$1(sanitizedCommand, {
+      maxBuffer: 1024 * 1024 * 10
+    });
+    return JSON.parse(stdout);
   }
   async addFavorite(url) {
     try {
@@ -180,15 +185,27 @@ class FavoritesService extends BaseIpcService {
         maxBuffer: 1024 * 1024 * 10
       });
       const output = JSON.parse(stdout);
-      console.log(output);
-      const insertStmt = this.db.prepare(
-        "INSERT INTO favorites (title, display_id) VALUES (?, ?)"
-      );
-      const result = insertStmt.run(output.title, output.display_id);
-      const getStmt = this.db.prepare(
-        "SELECT * FROM favorites WHERE rowid = ?"
-      );
-      return getStmt.get(result.lastInsertRowid);
+      if (output._type == "playlist") {
+        const parentInsertionResult = this.db.prepare("INSERT INTO favorites (id, type, title) VALUES (?, ?, ?)").run(output.channel_id, "playlist", output.title);
+        const parentPlaylistId = parentInsertionResult.lastInsertRowid;
+        for (const entry of output.entries) {
+          if (entry._type == "playlist") {
+            const playlist = await this.getYTJSONDump(entry.webpage_url);
+            playlist.entries.forEach((entry2) => {
+              const newInsertStmt = this.db.prepare(
+                "INSERT INTO favorites (id, type, title, parent_id) VALUES (?, ?, ?, ?)"
+              );
+              newInsertStmt.run(entry2.id, "url", entry2.title, parentPlaylistId);
+            });
+          }
+        }
+      } else {
+        this.db.prepare("INSERT INTO favorites (id, type, title) VALUES (?, ?, ?)").run(output.id, "url", output.title);
+        const getStmt = this.db.prepare(
+          "SELECT * FROM favorites WHERE rowid = ?"
+        );
+        return getStmt.get(result.lastInsertRowid);
+      }
     } catch (error) {
       console.error("Error adding favorite:", error);
       return null;
@@ -331,7 +348,7 @@ class DownloadService extends BaseIpcService {
         var _a;
         if (currentDownload == null ? void 0 : currentDownload.queueItem) {
           const stmt = db.prepare(
-            "INSERT INTO download (display_id, downloaded) VALUES (?, ?) ON CONFLICT(display_id) DO UPDATE SET downloaded = excluded.downloaded;"
+            "INSERT INTO download (id, downloaded) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET downloaded = excluded.downloaded;"
           );
           stmt.run(
             currentDownload.queueItem.url,
@@ -364,10 +381,9 @@ class DownloadService extends BaseIpcService {
   registerDatabase() {
     db.exec(`
       CREATE TABLE IF NOT EXISTS download (
-      id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+      id VARCHAR(2555) NOT NULL PRIMARY KEY,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       downloaded BOOLEAN,
-      display_id VARCHAR(255) NULL UNIQUE,
       UNIQUE(id)
       ); 
     `);
@@ -393,7 +409,7 @@ class DownloadService extends BaseIpcService {
     }
   }
   async processPlaylist(favorite) {
-    const sanitizedCommand = `${ytDlpPath} ${favorite.display_id} --flat-playlist --print id`;
+    const sanitizedCommand = `${ytDlpPath} ${favorite.id} --flat-playlist --print id`;
     try {
       const { stdout } = await execAsync(sanitizedCommand);
       const playlist = stdout.split("\n").filter(Boolean);

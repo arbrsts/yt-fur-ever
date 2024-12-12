@@ -9,7 +9,6 @@ export const Collection = () => {
   const { data } = fureverApi.useYtDlpStatusQuery();
   const [setSetting] = fureverApi.useSetSettingMutation();
 
-  console.log(data);
   const { data: setting } = fureverApi.useGetSettingQuery({ key: "savePath" });
 
   return (
